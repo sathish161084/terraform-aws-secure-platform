@@ -152,9 +152,9 @@ resource "aws_iam_role_policy" "vpc_flow_logs" {
 }
 
 resource "aws_flow_log" "this" {
-  iam_role_arn       = aws_iam_role.vpc_flow_logs.arn
+  iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
   log_destination_type = "cloud-watch-logs"
-  log_group_name     = aws_cloudwatch_log_group.vpc_flow_logs.name
-  resource_id        = aws_vpc.this.id
-  traffic_type       = "ALL"
+  log_group_name       = aws_cloudwatch_log_group.vpc_flow_logs.name
+  resource_id          = aws_vpc.this.id
+  traffic_type         = "ALL"
 }

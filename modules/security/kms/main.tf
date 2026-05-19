@@ -2,8 +2,8 @@ data "aws_caller_identity" "current" {}
 
 data "aws_iam_policy_document" "kms_key_policy" {
   statement {
-    sid     = "Allow administration of the key"
-    effect  = "Allow"
+    sid    = "Allow administration of the key"
+    effect = "Allow"
     principals {
       type        = "AWS"
       identifiers = [data.aws_caller_identity.current.arn]
@@ -15,10 +15,10 @@ data "aws_iam_policy_document" "kms_key_policy" {
   }
 
   statement {
-    sid     = "Allow use by AWS services"
-    effect  = "Allow"
+    sid    = "Allow use by AWS services"
+    effect = "Allow"
     principals {
-      type        = "Service"
+      type = "Service"
       identifiers = [
         "logs.amazonaws.com",
         "cloudtrail.amazonaws.com",

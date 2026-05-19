@@ -6,7 +6,6 @@ module "eks" {
 
   cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
-  public_access_cidrs             = []
 
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids

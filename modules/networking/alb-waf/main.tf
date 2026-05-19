@@ -52,11 +52,11 @@ resource "aws_s3_bucket" "alb_access_logs" {
 }
 
 resource "aws_lb" "this" {
-  name                       = "${var.name_prefix}-alb"
-  load_balancer_type         = "application"
-  internal                   = false
-  security_groups            = [aws_security_group.alb.id]
-  subnets                    = var.public_subnet_ids
+  name               = "${var.name_prefix}-alb"
+  load_balancer_type = "application"
+  internal           = false
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = var.public_subnet_ids
   access_logs {
     bucket  = aws_s3_bucket.alb_access_logs.bucket
     prefix  = "${var.name_prefix}-alb"
