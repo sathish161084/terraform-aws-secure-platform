@@ -46,7 +46,9 @@ resource "aws_wafv2_web_acl" "this" {
     name     = "AWSManagedCommonRules"
     priority = 1
 
-    override_action { none {} }
+    override_action {
+      none {}
+    }
 
     statement {
       managed_rule_group_statement {
