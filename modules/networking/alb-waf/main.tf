@@ -37,17 +37,21 @@ resource "aws_s3_bucket" "alb_access_logs" {
     enabled = true
   }
 
-  server_side_encryption_configuration {
-    rule {
-      apply_server_side_encryption_by_default {
-        sse_algorithm     = "aws:kms"
-        kms_master_key_id = "alias/aws/s3"
-      }
-    }
-  }
-
   tags = {
     Name = "${var.name_prefix}-alb-access-logs"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = "alias/aws/s3"
+    }
+
+    bucket_key_enabled = true
   }
 }
 
