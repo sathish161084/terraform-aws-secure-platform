@@ -23,6 +23,48 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   }
 }
 
+resource "aws_sns_topic" "cloudtrail" {
+  name              = "${var.name_prefix}-cloudtrail-topic"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/aws/cloudtrail/${var.name_prefix}"
+  retention_in_days = 365
+  kms_key_id        = "alias/aws/logs"
+}
+
+resource "aws_iam_role" "cloudtrail_logs" {
+  name = "${var.name_prefix}-cloudtrail-logs-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudtrail.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "cloudtrail_logs" {
+  name = "${var.name_prefix}-cloudtrail-logs-policy"
+  role = aws_iam_role.cloudtrail_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups"
+      ]
+      Resource = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+    }]
+  })
+}
+
 resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -77,6 +119,10 @@ resource "aws_cloudtrail" "this" {
   include_global_service_events = true
   is_multi_region_trail         = true
   enable_logging                = true
+  enable_log_file_validation    = true
+  sns_topic_name                = aws_sns_topic.cloudtrail.name
+  cloud_watch_logs_group_arn    = aws_cloudwatch_log_group.cloudtrail.arn
+  cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail_logs.arn
 
   depends_on = [aws_s3_bucket_policy.cloudtrail]
 }

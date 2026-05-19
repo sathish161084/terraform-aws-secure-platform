@@ -29,12 +29,39 @@ resource "aws_vpc_security_group_egress_rule" "all" {
   ip_protocol       = "-1"
 }
 
+resource "aws_s3_bucket" "alb_access_logs" {
+  bucket = "${var.name_prefix}-alb-access-logs"
+  acl    = "log-delivery-write"
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = "alias/aws/s3"
+      }
+    }
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-alb-access-logs"
+  }
+}
+
 resource "aws_lb" "this" {
   name                       = "${var.name_prefix}-alb"
   load_balancer_type         = "application"
   internal                   = false
   security_groups            = [aws_security_group.alb.id]
   subnets                    = var.public_subnet_ids
+  access_logs {
+    bucket  = aws_s3_bucket.alb_access_logs.bucket
+    prefix  = "${var.name_prefix}-alb"
+    enabled = true
+  }
   enable_deletion_protection = true
   drop_invalid_header_fields = true
 }

@@ -113,3 +113,48 @@ resource "aws_route_table_association" "database" {
   subnet_id      = each.value.id
   route_table_id = aws_route_table.database.id
 }
+
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${var.name_prefix}"
+  retention_in_days = 365
+  kms_key_id        = "alias/aws/logs"
+}
+
+resource "aws_iam_role" "vpc_flow_logs" {
+  name = "${var.name_prefix}-vpc-flow-logs-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "vpc_flow_logs" {
+  name = "${var.name_prefix}-vpc-flow-logs-policy"
+  role = aws_iam_role.vpc_flow_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups"
+      ]
+      Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
+    }]
+  })
+}
+
+resource "aws_flow_log" "this" {
+  iam_role_arn       = aws_iam_role.vpc_flow_logs.arn
+  log_destination_type = "cloud-watch-logs"
+  log_group_name     = aws_cloudwatch_log_group.vpc_flow_logs.name
+  resource_id        = aws_vpc.this.id
+  traffic_type       = "ALL"
+}
