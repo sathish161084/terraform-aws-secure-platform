@@ -1,5 +1,6 @@
 resource "aws_sns_topic" "alerts" {
-  name = "${var.name_prefix}-alerts"
+  name              = "${var.name_prefix}-alerts"
+  kms_master_key_id = "alias/aws/sns"
 }
 
 resource "aws_cloudwatch_metric_alarm" "estimated_charges" {
@@ -13,6 +14,6 @@ resource "aws_cloudwatch_metric_alarm" "estimated_charges" {
   threshold           = var.billing_threshold_usd
   alarm_description   = "Estimated AWS charges exceeded threshold"
 
-  dimensions = { Currency = "USD" }
+  dimensions    = { Currency = "USD" }
   alarm_actions = [aws_sns_topic.alerts.arn]
 }
