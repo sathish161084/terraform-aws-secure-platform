@@ -7,6 +7,7 @@ resource "aws_security_group" "endpoints" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "https_from_vpc" {
+  description       = "Allow HTTPS traffic from within the VPC to VPC endpoints"
   security_group_id = aws_security_group.endpoints.id
   cidr_ipv4         = var.vpc_cidr
   ip_protocol       = "tcp"

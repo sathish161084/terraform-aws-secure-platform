@@ -5,6 +5,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "https" {
+  description       = "Allow HTTPS ingress to the ALB"
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "tcp"
@@ -13,6 +14,7 @@ resource "aws_vpc_security_group_ingress_rule" "https" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "http" {
+  description       = "Allow HTTP ingress to the ALB"
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "tcp"
@@ -21,17 +23,20 @@ resource "aws_vpc_security_group_ingress_rule" "http" {
 }
 
 resource "aws_vpc_security_group_egress_rule" "all" {
+  description       = "Allow all outbound traffic from the ALB security group"
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }
 
 resource "aws_lb" "this" {
-  name               = "${var.name_prefix}-alb"
-  load_balancer_type = "application"
-  internal           = false
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = var.public_subnet_ids
+  name                      = "${var.name_prefix}-alb"
+  load_balancer_type        = "application"
+  internal                  = false
+  security_groups           = [aws_security_group.alb.id]
+  subnets                   = var.public_subnet_ids
+  enable_deletion_protection = true
+  drop_invalid_header_fields = true
 }
 
 resource "aws_wafv2_web_acl" "this" {
@@ -74,4 +79,51 @@ resource "aws_wafv2_web_acl" "this" {
 resource "aws_wafv2_web_acl_association" "alb" {
   resource_arn = aws_lb.this.arn
   web_acl_arn  = aws_wafv2_web_acl.this.arn
+}
+
+resource "aws_cloudwatch_log_group" "waf" {
+  name              = "/aws/waf/${var.name_prefix}-waf"
+  retention_in_days = 30
+}
+
+resource "aws_iam_role" "waf_logging" {
+  name = "${var.name_prefix}-waf-logging-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "wafv2.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "waf_logging" {
+  name = "${var.name_prefix}-waf-logging-policy"
+  role = aws_iam_role.waf_logging.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups"
+      ]
+      Resource = aws_cloudwatch_log_group.waf.arn
+    }]
+  })
+}
+
+resource "aws_wafv2_web_acl_logging_configuration" "this" {
+  resource_arn            = aws_wafv2_web_acl.this.arn
+  log_destination_configs = [aws_cloudwatch_log_group.waf.arn]
+
+  redacted_fields {
+    single_header {
+      name = "Authorization"
+    }
+  }
 }

@@ -1,5 +1,6 @@
 resource "aws_sns_topic" "alerts" {
-  name = "${var.name_prefix}-alerts"
+  name              = "${var.name_prefix}-alerts"
+  kms_master_key_id = "alias/aws/sns"
 }
 
 resource "aws_cloudwatch_metric_alarm" "estimated_charges" {
