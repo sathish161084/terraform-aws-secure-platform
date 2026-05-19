@@ -123,7 +123,7 @@ resource "aws_wafv2_web_acl_logging_configuration" "this" {
 
   redacted_fields {
     single_header {
-      name = "Authorization"
+      name = "authorization"
     }
   }
 }
