@@ -54,6 +54,24 @@ resource "aws_vpc_security_group_egress_rule" "all_outbound" {
   ip_protocol       = "-1"
 }
 
+resource "aws_iam_role" "monitoring" {
+  name = "${var.name_prefix}-rds-monitoring-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "monitoring.rds.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "monitoring" {
+  role       = aws_iam_role.monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
+}
+
 resource "aws_db_instance" "this" {
   identifier = "${var.name_prefix}-postgres"
 
@@ -80,6 +98,7 @@ resource "aws_db_instance" "this" {
   performance_insights_kms_key_id     = var.kms_key_arn
   copy_tags_to_snapshot               = true
   monitoring_interval                 = 60
+  monitoring_role_arn                 = aws_iam_role.monitoring.arn
   multi_az                            = true
   parameter_group_name                = aws_db_parameter_group.this.name
 

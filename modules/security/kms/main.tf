@@ -1,4 +1,5 @@
 data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
 
 data "aws_iam_policy_document" "kms_key_policy" {
   statement {
@@ -20,8 +21,10 @@ data "aws_iam_policy_document" "kms_key_policy" {
     principals {
       type = "Service"
       identifiers = [
-        "logs.amazonaws.com",
+        "logs.${data.aws_region.current.name}.amazonaws.com",
         "cloudtrail.amazonaws.com",
+        "events.amazonaws.com",
+        "s3.amazonaws.com",
         "sns.amazonaws.com",
         "secretsmanager.amazonaws.com"
       ]

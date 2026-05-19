@@ -8,7 +8,32 @@ resource "aws_s3_bucket" "this" {
 
 resource "aws_sns_topic" "this_events" {
   name              = "${var.bucket_name}-events"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = var.kms_key_arn
+}
+
+data "aws_iam_policy_document" "this_events" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.this_events.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.this.arn]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "this_events" {
+  arn    = aws_sns_topic.this_events.arn
+  policy = data.aws_iam_policy_document.this_events.json
 }
 
 resource "aws_s3_bucket_notification" "this" {
@@ -18,6 +43,8 @@ resource "aws_s3_bucket_notification" "this" {
     topic_arn = aws_sns_topic.this_events.arn
     events    = ["s3:ObjectCreated:*"]
   }
+
+  depends_on = [aws_sns_topic_policy.this_events]
 }
 
 resource "aws_s3_bucket_public_access_block" "this" {

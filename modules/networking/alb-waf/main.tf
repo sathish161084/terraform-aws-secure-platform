@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_security_group" "alb" {
   name        = "${var.name_prefix}-alb-sg"
   description = "Public ALB security group"
@@ -21,6 +23,7 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 }
 
 resource "aws_s3_bucket" "alb_access_logs" {
+  #checkov:skip=CKV_AWS_145:ALB access log delivery supports SSE-S3 for this log bucket.
   bucket = "${var.name_prefix}-alb-access-logs"
 
   tags = {
@@ -30,21 +33,32 @@ resource "aws_s3_bucket" "alb_access_logs" {
 
 resource "aws_sns_topic" "alb_access_logs_events" {
   name              = "${var.name_prefix}-alb-access-logs-events"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = var.kms_key_arn
 }
 
-resource "aws_s3_bucket_notification" "alb_access_logs" {
-  bucket = aws_s3_bucket.alb_access_logs.id
+data "aws_iam_policy_document" "alb_access_logs_events" {
+  statement {
+    effect = "Allow"
 
-  topic {
-    topic_arn = aws_sns_topic.alb_access_logs_events.arn
-    events    = ["s3:ObjectCreated:*"]
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alb_access_logs_events.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.alb_access_logs.arn]
+    }
   }
 }
 
-resource "aws_s3_bucket_acl" "alb_access_logs" {
-  bucket = aws_s3_bucket.alb_access_logs.id
-  acl    = "log-delivery-write"
+resource "aws_sns_topic_policy" "alb_access_logs_events" {
+  arn    = aws_sns_topic.alb_access_logs_events.arn
+  policy = data.aws_iam_policy_document.alb_access_logs_events.json
 }
 
 resource "aws_s3_bucket_versioning" "alb_access_logs" {
@@ -90,14 +104,54 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" 
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = "alias/aws/s3"
+      sse_algorithm = "AES256"
     }
-
-    bucket_key_enabled = true
   }
 }
 
+data "aws_iam_policy_document" "alb_access_logs" {
+  statement {
+    sid    = "AllowLoadBalancerAccessLogDelivery"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.alb_access_logs.arn}/${var.name_prefix}-alb/AWSLogs/${data.aws_caller_identity.current.account_id}/*"]
+  }
+
+  statement {
+    sid    = "AllowLoadBalancerAccessLogAclCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.alb_access_logs.arn]
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+  policy = data.aws_iam_policy_document.alb_access_logs.json
+}
+
+resource "aws_s3_bucket_notification" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  topic {
+    topic_arn = aws_sns_topic.alb_access_logs_events.arn
+    events    = ["s3:ObjectCreated:*"]
+  }
+
+  depends_on = [aws_sns_topic_policy.alb_access_logs_events]
+}
 
 resource "aws_lb" "this" {
   name               = "${var.name_prefix}-alb"
@@ -112,6 +166,8 @@ resource "aws_lb" "this" {
   }
   enable_deletion_protection = true
   drop_invalid_header_fields = true
+
+  depends_on = [aws_s3_bucket_policy.alb_access_logs]
 }
 
 resource "aws_wafv2_web_acl" "this" {
@@ -201,9 +257,9 @@ resource "aws_wafv2_web_acl_association" "alb" {
 }
 
 resource "aws_cloudwatch_log_group" "waf" {
-  name              = "/aws/waf/${var.name_prefix}-waf"
+  name              = "aws-waf-logs-${var.name_prefix}-waf"
   retention_in_days = 365
-  kms_key_id        = "alias/aws/logs"
+  kms_key_id        = var.kms_key_arn
 }
 
 resource "aws_iam_role" "waf_logging" {

@@ -1,10 +1,37 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_s3_bucket" "cloudtrail" {
   bucket = "${var.name_prefix}-cloudtrail-logs"
 }
 
 resource "aws_sns_topic" "cloudtrail_events" {
   name              = "${var.name_prefix}-cloudtrail-events"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = var.kms_key_arn
+}
+
+data "aws_iam_policy_document" "cloudtrail_events" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.cloudtrail_events.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.cloudtrail.arn]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "cloudtrail_events" {
+  arn    = aws_sns_topic.cloudtrail_events.arn
+  policy = data.aws_iam_policy_document.cloudtrail_events.json
 }
 
 resource "aws_s3_bucket_notification" "cloudtrail" {
@@ -14,6 +41,8 @@ resource "aws_s3_bucket_notification" "cloudtrail" {
     topic_arn = aws_sns_topic.cloudtrail_events.arn
     events    = ["s3:ObjectCreated:*"]
   }
+
+  depends_on = [aws_sns_topic_policy.cloudtrail_events]
 }
 
 resource "aws_s3_bucket_versioning" "cloudtrail" {
@@ -31,7 +60,7 @@ data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
 
     principals {
       type        = "AWS"
-      identifiers = ["arn:aws:iam::aws:root"]
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
     }
 
     actions = [
@@ -43,6 +72,23 @@ data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
       "kms:CreateGrant",
       "kms:ListGrants",
       "kms:RevokeGrant"
+    ]
+
+    resources = ["arn:aws:kms:*:*:key/*"]
+  }
+
+  statement {
+    sid    = "AllowCloudTrailUseOfTheKey"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:DescribeKey",
+      "kms:GenerateDataKey*"
     ]
 
     resources = ["arn:aws:kms:*:*:key/*"]
@@ -80,13 +126,32 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
 
 resource "aws_sns_topic" "cloudtrail" {
   name              = "${var.name_prefix}-cloudtrail-topic"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = var.kms_key_arn
+}
+
+data "aws_iam_policy_document" "cloudtrail_topic" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.cloudtrail.arn]
+  }
+}
+
+resource "aws_sns_topic_policy" "cloudtrail" {
+  arn    = aws_sns_topic.cloudtrail.arn
+  policy = data.aws_iam_policy_document.cloudtrail_topic.json
 }
 
 resource "aws_cloudwatch_log_group" "cloudtrail" {
   name              = "/aws/cloudtrail/${var.name_prefix}"
   retention_in_days = 365
-  kms_key_id        = "alias/aws/logs"
+  kms_key_id        = var.kms_key_arn
 }
 
 resource "aws_iam_role" "cloudtrail_logs" {
@@ -198,10 +263,13 @@ resource "aws_cloudtrail" "this" {
   enable_log_file_validation    = true
   sns_topic_name                = aws_sns_topic.cloudtrail.name
   kms_key_id                    = aws_kms_key.cloudtrail.arn
-  cloud_watch_logs_group_arn    = aws_cloudwatch_log_group.cloudtrail.arn
+  cloud_watch_logs_group_arn    = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
   cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail_logs.arn
 
-  depends_on = [aws_s3_bucket_policy.cloudtrail]
+  depends_on = [
+    aws_s3_bucket_policy.cloudtrail,
+    aws_sns_topic_policy.cloudtrail
+  ]
 }
 
 resource "aws_guardduty_detector" "this" {
@@ -241,7 +309,32 @@ resource "aws_s3_bucket" "config" {
 
 resource "aws_sns_topic" "config_events" {
   name              = "${var.name_prefix}-config-events"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = var.kms_key_arn
+}
+
+data "aws_iam_policy_document" "config_events" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["s3.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.config_events.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.config.arn]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "config_events" {
+  arn    = aws_sns_topic.config_events.arn
+  policy = data.aws_iam_policy_document.config_events.json
 }
 
 resource "aws_s3_bucket_notification" "config" {
@@ -251,6 +344,8 @@ resource "aws_s3_bucket_notification" "config" {
     topic_arn = aws_sns_topic.config_events.arn
     events    = ["s3:ObjectCreated:*"]
   }
+
+  depends_on = [aws_sns_topic_policy.config_events]
 }
 
 resource "aws_s3_bucket_versioning" "config" {
@@ -283,6 +378,45 @@ resource "aws_s3_bucket_public_access_block" "config" {
   restrict_public_buckets = true
 }
 
+data "aws_iam_policy_document" "config_bucket_policy" {
+  statement {
+    sid    = "AWSConfigBucketPermissionsCheck"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions   = ["s3:GetBucketAcl"]
+    resources = [aws_s3_bucket.config.arn]
+  }
+
+  statement {
+    sid    = "AWSConfigBucketDelivery"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["config.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.config.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/Config/*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "config" {
+  bucket = aws_s3_bucket.config.id
+  policy = data.aws_iam_policy_document.config_bucket_policy.json
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "config" {
   bucket = aws_s3_bucket.config.id
 
@@ -305,6 +439,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "config" {
 }
 
 resource "aws_config_configuration_recorder" "this" {
+  count = var.create_config_recorder ? 1 : 0
+
   name     = "${var.name_prefix}-config-recorder"
   role_arn = aws_iam_role.config.arn
 
@@ -315,14 +451,21 @@ resource "aws_config_configuration_recorder" "this" {
 }
 
 resource "aws_config_delivery_channel" "this" {
+  count = var.create_config_recorder ? 1 : 0
+
   name           = "${var.name_prefix}-config-delivery"
   s3_bucket_name = aws_s3_bucket.config.bucket
 
-  depends_on = [aws_config_configuration_recorder.this]
+  depends_on = [
+    aws_config_configuration_recorder.this,
+    aws_s3_bucket_policy.config
+  ]
 }
 
 resource "aws_config_configuration_recorder_status" "this" {
-  name       = aws_config_configuration_recorder.this.name
+  count = var.create_config_recorder ? 1 : 0
+
+  name       = aws_config_configuration_recorder.this[0].name
   is_enabled = true
 
   depends_on = [aws_config_delivery_channel.this]

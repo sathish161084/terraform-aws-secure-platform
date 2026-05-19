@@ -121,7 +121,7 @@ resource "aws_route_table_association" "database" {
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   name              = "/aws/vpc/${var.name_prefix}"
   retention_in_days = 365
-  kms_key_id        = "alias/aws/logs"
+  kms_key_id        = var.kms_key_arn
 }
 
 resource "aws_iam_role" "vpc_flow_logs" {
@@ -158,7 +158,7 @@ resource "aws_iam_role_policy" "vpc_flow_logs" {
 resource "aws_flow_log" "this" {
   iam_role_arn         = aws_iam_role.vpc_flow_logs.arn
   log_destination_type = "cloud-watch-logs"
-  log_group_name       = aws_cloudwatch_log_group.vpc_flow_logs.name
+  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
   vpc_id               = aws_vpc.this.id
   traffic_type         = "ALL"
 }
