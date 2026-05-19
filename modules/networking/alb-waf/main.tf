@@ -23,11 +23,6 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 resource "aws_s3_bucket" "alb_access_logs" {
   bucket = "${var.name_prefix}-alb-access-logs"
 
-  logging {
-    target_bucket = aws_s3_bucket.alb_access_logs.bucket
-    target_prefix = "alb-access-logs/"
-  }
-
   tags = {
     Name = "${var.name_prefix}-alb-access-logs"
   }

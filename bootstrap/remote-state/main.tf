@@ -1,11 +1,6 @@
 resource "aws_s3_bucket" "remote_state" {
   bucket = var.bucket_name
 
-  logging {
-    target_bucket = aws_s3_bucket.remote_state.bucket
-    target_prefix = "remote-state-logs/"
-  }
-
   lifecycle {
     prevent_destroy = true
   }
@@ -90,4 +85,3 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "remote_state" {
     bucket_key_enabled = true
   }
 }
-

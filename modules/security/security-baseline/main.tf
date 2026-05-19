@@ -1,10 +1,5 @@
 resource "aws_s3_bucket" "cloudtrail" {
   bucket = "${var.name_prefix}-cloudtrail-logs"
-
-  logging {
-    target_bucket = aws_s3_bucket.cloudtrail.bucket
-    target_prefix = "cloudtrail-logs/"
-  }
 }
 
 resource "aws_sns_topic" "cloudtrail_events" {
@@ -242,11 +237,6 @@ resource "aws_iam_role_policy_attachment" "config" {
 
 resource "aws_s3_bucket" "config" {
   bucket = "${var.name_prefix}-aws-config-logs"
-
-  logging {
-    target_bucket = aws_s3_bucket.config.bucket
-    target_prefix = "config-logs/"
-  }
 }
 
 resource "aws_sns_topic" "config_events" {

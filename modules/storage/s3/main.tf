@@ -1,11 +1,6 @@
 resource "aws_s3_bucket" "this" {
   bucket = var.bucket_name
 
-  logging {
-    target_bucket = aws_s3_bucket.this.bucket
-    target_prefix = "s3-logs/"
-  }
-
   lifecycle {
     prevent_destroy = true
   }
