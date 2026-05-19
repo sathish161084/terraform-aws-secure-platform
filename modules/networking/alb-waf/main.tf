@@ -13,15 +13,6 @@ resource "aws_vpc_security_group_ingress_rule" "https" {
   to_port           = 443
 }
 
-resource "aws_vpc_security_group_ingress_rule" "http" {
-  description       = "Allow HTTP ingress to the ALB"
-  security_group_id = aws_security_group.alb.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "tcp"
-  from_port         = 80
-  to_port           = 80
-}
-
 resource "aws_vpc_security_group_egress_rule" "all" {
   description       = "Allow all outbound traffic from the ALB security group"
   security_group_id = aws_security_group.alb.id
@@ -31,14 +22,48 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 
 resource "aws_s3_bucket" "alb_access_logs" {
   bucket = "${var.name_prefix}-alb-access-logs"
-  acl    = "log-delivery-write"
-
-  versioning {
-    enabled = true
-  }
 
   tags = {
     Name = "${var.name_prefix}-alb-access-logs"
+  }
+}
+
+resource "aws_s3_bucket_acl" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+  acl    = "log-delivery-write"
+}
+
+resource "aws_s3_bucket_versioning" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  rule {
+    id     = "expire-alb-access-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 365
+    }
   }
 }
 
@@ -79,7 +104,7 @@ resource "aws_wafv2_web_acl" "this" {
   }
 
   rule {
-    name     = "AWSManagedCommonRules"
+    name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
 
     override_action {
@@ -96,6 +121,28 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.name_prefix}-common-rules"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "AWSManagedRulesKnownBadInputsRuleSet"
+    priority = 2
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesKnownBadInputsRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name_prefix}-known-bad-inputs"
       sampled_requests_enabled   = true
     }
   }

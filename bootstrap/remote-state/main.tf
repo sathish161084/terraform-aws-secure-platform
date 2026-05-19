@@ -38,6 +38,23 @@ resource "aws_s3_bucket_versioning" "remote_state" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "remote_state" {
+  bucket = aws_s3_bucket.remote_state.id
+
+  rule {
+    id     = "expire-remote-state"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "remote_state" {
   bucket = aws_s3_bucket.remote_state.id
 

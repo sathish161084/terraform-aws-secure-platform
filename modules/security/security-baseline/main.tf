@@ -10,16 +10,48 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
   }
 }
 
+resource "aws_kms_key" "cloudtrail" {
+  description             = "${var.name_prefix}-cloudtrail"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+
+  tags = {
+    Name = "${var.name_prefix}-cloudtrail"
+  }
+}
+
+resource "aws_kms_alias" "cloudtrail" {
+  name          = "alias/${var.name_prefix}-cloudtrail"
+  target_key_id = aws_kms_key.cloudtrail.key_id
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = "alias/aws/s3"
+      kms_master_key_id = aws_kms_key.cloudtrail.arn
     }
 
     bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    id     = "expire-cloudtrail-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 365
+    }
   }
 }
 
@@ -121,6 +153,7 @@ resource "aws_cloudtrail" "this" {
   enable_logging                = true
   enable_log_file_validation    = true
   sns_topic_name                = aws_sns_topic.cloudtrail.name
+  kms_key_id                    = aws_kms_key.cloudtrail.arn
   cloud_watch_logs_group_arn    = aws_cloudwatch_log_group.cloudtrail.arn
   cloud_watch_logs_role_arn     = aws_iam_role.cloudtrail_logs.arn
 
@@ -176,6 +209,23 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "config" {
   }
 }
 
+resource "aws_s3_bucket_lifecycle_configuration" "config" {
+  bucket = aws_s3_bucket.config.id
+
+  rule {
+    id     = "expire-config-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 365
+    }
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "config" {
   bucket = aws_s3_bucket.config.id
 
@@ -188,6 +238,11 @@ resource "aws_s3_bucket_public_access_block" "config" {
 resource "aws_config_configuration_recorder" "this" {
   name     = "${var.name_prefix}-config-recorder"
   role_arn = aws_iam_role.config.arn
+
+  recording_group {
+    all_supported                 = true
+    include_global_resource_types = true
+  }
 }
 
 resource "aws_config_delivery_channel" "this" {

@@ -4,8 +4,9 @@ module "eks" {
   cluster_name    = "${var.name_prefix}-eks"
   cluster_version = "1.31"
 
-  cluster_endpoint_public_access  = false
-  cluster_endpoint_private_access = true
+  cluster_endpoint_public_access         = false
+  cluster_endpoint_private_access        = true
+  cloudwatch_log_group_retention_in_days = 365
 
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids
