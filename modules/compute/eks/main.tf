@@ -1,12 +1,12 @@
 module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=8a0efdbbc84180a26e0bacfd2b6fcfceac53b3b6"
 
   cluster_name    = "${var.name_prefix}-eks"
   cluster_version = "1.31"
 
-  cluster_endpoint_public_access  = true
+  cluster_endpoint_public_access  = false
   cluster_endpoint_private_access = true
+  public_access_cidrs             = []
 
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids

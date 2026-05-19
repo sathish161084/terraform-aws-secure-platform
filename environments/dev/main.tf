@@ -56,6 +56,7 @@ module "ecr" {
     "backend",
     "worker"
   ]
+  kms_key_arn = module.kms.key_arn
 }
 
 module "secrets_manager" {

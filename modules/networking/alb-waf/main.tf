@@ -83,7 +83,8 @@ resource "aws_wafv2_web_acl_association" "alb" {
 
 resource "aws_cloudwatch_log_group" "waf" {
   name              = "/aws/waf/${var.name_prefix}-waf"
-  retention_in_days = 30
+  retention_in_days = 365
+  kms_key_id        = "alias/aws/logs"
 }
 
 resource "aws_iam_role" "waf_logging" {
