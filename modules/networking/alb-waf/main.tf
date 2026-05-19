@@ -23,8 +23,27 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 resource "aws_s3_bucket" "alb_access_logs" {
   bucket = "${var.name_prefix}-alb-access-logs"
 
+  logging {
+    target_bucket = aws_s3_bucket.alb_access_logs.bucket
+    target_prefix = "alb-access-logs/"
+  }
+
   tags = {
     Name = "${var.name_prefix}-alb-access-logs"
+  }
+}
+
+resource "aws_sns_topic" "alb_access_logs_events" {
+  name              = "${var.name_prefix}-alb-access-logs-events"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_s3_bucket_notification" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  topic {
+    topic_arn = aws_sns_topic.alb_access_logs_events.arn
+    events    = ["s3:ObjectCreated:*"]
   }
 }
 
@@ -41,15 +60,6 @@ resource "aws_s3_bucket_versioning" "alb_access_logs" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "alb_access_logs" {
-  bucket = aws_s3_bucket.alb_access_logs.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
 resource "aws_s3_bucket_lifecycle_configuration" "alb_access_logs" {
   bucket = aws_s3_bucket.alb_access_logs.id
 
@@ -64,7 +74,20 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_access_logs" {
     expiration {
       days = 365
     }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_access_logs" {
+  bucket = aws_s3_bucket.alb_access_logs.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" {
@@ -79,6 +102,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "alb_access_logs" 
     bucket_key_enabled = true
   }
 }
+
 
 resource "aws_lb" "this" {
   name               = "${var.name_prefix}-alb"
@@ -143,6 +167,28 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.name_prefix}-known-bad-inputs"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "AWSManagedRulesAmazonIpReputationList"
+    priority = 3
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesAmazonIpReputationList"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.name_prefix}-ip-reputation"
       sampled_requests_enabled   = true
     }
   }

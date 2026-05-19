@@ -11,6 +11,27 @@ resource "aws_db_subnet_group" "this" {
   subnet_ids = var.database_subnet_ids
 }
 
+resource "aws_db_parameter_group" "this" {
+  name        = "${var.name_prefix}-postgresql-parameters"
+  family      = "postgres16"
+  description = "PostgreSQL parameter group for query logging and SSL enforcement"
+
+  parameter {
+    name  = "log_statement"
+    value = "all"
+  }
+
+  parameter {
+    name  = "log_min_duration_statement"
+    value = "0"
+  }
+
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
+}
+
 resource "aws_security_group" "rds" {
   name        = "${var.name_prefix}-rds-sg"
   description = "Allow PostgreSQL from application nodes only"
@@ -60,6 +81,7 @@ resource "aws_db_instance" "this" {
   copy_tags_to_snapshot               = true
   monitoring_interval                 = 60
   multi_az                            = true
+  parameter_group_name                = aws_db_parameter_group.this.name
 
   publicly_accessible     = false
   backup_retention_period = 7

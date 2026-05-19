@@ -1,8 +1,27 @@
 resource "aws_s3_bucket" "this" {
   bucket = var.bucket_name
 
+  logging {
+    target_bucket = aws_s3_bucket.this.bucket
+    target_prefix = "s3-logs/"
+  }
+
   lifecycle {
     prevent_destroy = true
+  }
+}
+
+resource "aws_sns_topic" "this_events" {
+  name              = "${var.bucket_name}-events"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_s3_bucket_notification" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  topic {
+    topic_arn = aws_sns_topic.this_events.arn
+    events    = ["s3:ObjectCreated:*"]
   }
 }
 
@@ -41,6 +60,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     expiration {
       days = 365
     }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
 }
 
@@ -55,6 +78,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
     bucket_key_enabled = true
   }
 }
+
 
 data "aws_iam_policy_document" "deny_insecure_transport" {
   statement {

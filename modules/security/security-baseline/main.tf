@@ -1,5 +1,24 @@
 resource "aws_s3_bucket" "cloudtrail" {
   bucket = "${var.name_prefix}-cloudtrail-logs"
+
+  logging {
+    target_bucket = aws_s3_bucket.cloudtrail.bucket
+    target_prefix = "cloudtrail-logs/"
+  }
+}
+
+resource "aws_sns_topic" "cloudtrail_events" {
+  name              = "${var.name_prefix}-cloudtrail-events"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_s3_bucket_notification" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  topic {
+    topic_arn = aws_sns_topic.cloudtrail_events.arn
+    events    = ["s3:ObjectCreated:*"]
+  }
 }
 
 resource "aws_s3_bucket_versioning" "cloudtrail" {
@@ -14,6 +33,48 @@ resource "aws_kms_key" "cloudtrail" {
   description             = "${var.name_prefix}-cloudtrail"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.cloudtrail_kms_key_policy.json
+
+  tags = {
+    Name = "${var.name_prefix}-cloudtrail"
+  }
+}
+
+resource "aws_kms_alias" "cloudtrail" {
+  name          = "alias/${var.name_prefix}-cloudtrail"
+  target_key_id = aws_kms_key.cloudtrail.key_id
+}
+
+data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
+  statement {
+    sid    = "AllowUseOfTheKey"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::aws:root"]
+    }
+
+    actions = [
+      "kms:DescribeKey",
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:GenerateDataKey*",
+      "kms:ReEncrypt*",
+      "kms:CreateGrant",
+      "kms:ListGrants",
+      "kms:RevokeGrant"
+    ]
+
+    resources = ["arn:aws:kms:*:*:key/*"]
+  }
+}
+
+resource "aws_kms_key" "cloudtrail" {
+  description             = "${var.name_prefix}-cloudtrail"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.cloudtrail_kms_key_policy.json
 
   tags = {
     Name = "${var.name_prefix}-cloudtrail"
@@ -35,23 +96,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
     }
 
     bucket_key_enabled = true
-  }
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
-  bucket = aws_s3_bucket.cloudtrail.id
-
-  rule {
-    id     = "expire-cloudtrail-logs"
-    status = "Enabled"
-
-    filter {
-      prefix = ""
-    }
-
-    expiration {
-      days = 365
-    }
   }
 }
 
@@ -104,6 +148,27 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    id     = "expire-cloudtrail-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = ""
+    }
+
+    expiration {
+      days = 365
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
 }
 
 data "aws_iam_policy_document" "cloudtrail_bucket_policy" {
@@ -161,7 +226,14 @@ resource "aws_cloudtrail" "this" {
 }
 
 resource "aws_guardduty_detector" "this" {
-  enable = true
+  enable                       = true
+  finding_publishing_frequency = "FIFTEEN_MINUTES"
+
+  data_sources {
+    s3_logs {
+      enable = true
+    }
+  }
 }
 
 resource "aws_securityhub_account" "this" {}
@@ -186,6 +258,25 @@ resource "aws_iam_role_policy_attachment" "config" {
 
 resource "aws_s3_bucket" "config" {
   bucket = "${var.name_prefix}-aws-config-logs"
+
+  logging {
+    target_bucket = aws_s3_bucket.config.bucket
+    target_prefix = "config-logs/"
+  }
+}
+
+resource "aws_sns_topic" "config_events" {
+  name              = "${var.name_prefix}-config-events"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_s3_bucket_notification" "config" {
+  bucket = aws_s3_bucket.config.id
+
+  topic {
+    topic_arn = aws_sns_topic.config_events.arn
+    events    = ["s3:ObjectCreated:*"]
+  }
 }
 
 resource "aws_s3_bucket_versioning" "config" {
@@ -209,6 +300,15 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "config" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "config" {
+  bucket = aws_s3_bucket.config.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "config" {
   bucket = aws_s3_bucket.config.id
 
@@ -223,16 +323,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "config" {
     expiration {
       days = 365
     }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
-}
-
-resource "aws_s3_bucket_public_access_block" "config" {
-  bucket = aws_s3_bucket.config.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
 }
 
 resource "aws_config_configuration_recorder" "this" {

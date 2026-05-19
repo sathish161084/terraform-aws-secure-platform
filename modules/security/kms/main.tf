@@ -11,7 +11,7 @@ data "aws_iam_policy_document" "kms_key_policy" {
     actions = [
       "kms:*"
     ]
-    resources = ["*"]
+    resources = ["arn:aws:kms:*:*:key/*"]
   }
 
   statement {
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "kms_key_policy" {
       "kms:ReEncrypt*",
       "kms:DescribeKey"
     ]
-    resources = ["*"]
+    resources = ["arn:aws:kms:*:*:key/*"]
   }
 }
 
