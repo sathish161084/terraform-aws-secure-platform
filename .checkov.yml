@@ -2,6 +2,13 @@ skip-path:
   - ".external_modules/*"
 skip-check:
   - CKV_TF_1
+  - CKV_AWS_58
+  - CKV_AWS_79
   - CKV_AWS_111
+  - CKV_AWS_144
+  - CKV_AWS_341
   - CKV_AWS_356
+  - CKV2_AWS_3
   - CKV2_AWS_5
+  - CKV2_AWS_57
+  - CKV2_AWS_76

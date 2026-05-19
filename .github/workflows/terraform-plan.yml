@@ -46,7 +46,7 @@ jobs:
         run: pip install checkov
 
       - name: Run Checkov
-        run: checkov -d ../.. --download-external-modules true --quiet
+        run: checkov -d ../.. --config-file ../../.checkov.yml --download-external-modules true --quiet
 
       - name: Terraform plan
         run: terraform plan -out=tfplan

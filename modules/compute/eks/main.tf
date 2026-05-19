@@ -35,6 +35,12 @@ module "eks" {
       max_size       = 3
       desired_size   = 2
       subnet_ids     = var.private_subnet_ids
+
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 1
+      }
     }
   }
 }
