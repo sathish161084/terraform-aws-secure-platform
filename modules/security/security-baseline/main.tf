@@ -29,22 +29,6 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
   }
 }
 
-resource "aws_kms_key" "cloudtrail" {
-  description             = "${var.name_prefix}-cloudtrail"
-  deletion_window_in_days = 30
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.cloudtrail_kms_key_policy.json
-
-  tags = {
-    Name = "${var.name_prefix}-cloudtrail"
-  }
-}
-
-resource "aws_kms_alias" "cloudtrail" {
-  name          = "alias/${var.name_prefix}-cloudtrail"
-  target_key_id = aws_kms_key.cloudtrail.key_id
-}
-
 data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
   statement {
     sid    = "AllowUseOfTheKey"
