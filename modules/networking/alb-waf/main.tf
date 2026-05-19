@@ -30,11 +30,11 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 }
 
 resource "aws_lb" "this" {
-  name                      = "${var.name_prefix}-alb"
-  load_balancer_type        = "application"
-  internal                  = false
-  security_groups           = [aws_security_group.alb.id]
-  subnets                   = var.public_subnet_ids
+  name                       = "${var.name_prefix}-alb"
+  load_balancer_type         = "application"
+  internal                   = false
+  security_groups            = [aws_security_group.alb.id]
+  subnets                    = var.public_subnet_ids
   enable_deletion_protection = true
   drop_invalid_header_fields = true
 }
@@ -106,8 +106,8 @@ resource "aws_iam_role_policy" "waf_logging" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = [
+      Effect = "Allow"
+      Action = [
         "logs:CreateLogStream",
         "logs:PutLogEvents",
         "logs:DescribeLogGroups"
