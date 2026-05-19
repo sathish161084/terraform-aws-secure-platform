@@ -38,7 +38,9 @@ resource "aws_wafv2_web_acl" "this" {
   name  = "${var.name_prefix}-waf"
   scope = "REGIONAL"
 
-  default_action { allow {} }
+  default_action {
+    allow {}
+  }
 
   rule {
     name     = "AWSManagedCommonRules"
