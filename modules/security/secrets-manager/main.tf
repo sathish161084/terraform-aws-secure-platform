@@ -8,7 +8,7 @@ resource "aws_secretsmanager_secret" "db_password" {
   kms_key_id = var.kms_key_arn
 
   rotation_rules {
-    automatically_after_days = 30
+    automatically_after_days = 10
   }
 }
 
