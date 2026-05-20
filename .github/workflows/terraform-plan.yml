@@ -32,6 +32,8 @@ jobs:
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
 
       - name: Terraform fmt
         run: terraform fmt -check -recursive ../..
@@ -42,11 +44,23 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+
       - name: Install Checkov
         run: pip install checkov
 
       - name: Run Checkov
         run: checkov -d ../.. --config-file ../../.checkov.yml --download-external-modules true --quiet
 
-      - name: Terraform plan
-        run: terraform plan -out=tfplan
+      - name: Install OPA
+        run: |
+          curl -L -o /tmp/opa https://openpolicyagent.org/downloads/v0.68.0/opa_linux_amd64_static
+          chmod +x /tmp/opa
+          sudo mv /tmp/opa /usr/local/bin/opa
+          opa version
+
+      - name: Run OPA policies
+        run: |
+          terraform show -json tfplan > tfplan.json
+          opa eval --fail-defined --format pretty --data ../../policies/opa --input tfplan.json 'data.terraform.security.deny[_]'

@@ -14,6 +14,12 @@ variable "github_branch" {
   default     = "main"
 }
 
+variable "github_environment" {
+  description = "Allowed GitHub Actions environment for protected applies"
+  type        = string
+  default     = "dev"
+}
+
 variable "terraform_state_bucket" {
   description = "Terraform remote state bucket"
   type        = string
