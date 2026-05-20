@@ -4,12 +4,9 @@ resource "random_password" "db" {
 }
 
 resource "aws_secretsmanager_secret" "db_password" {
-  name       = "${var.name_prefix}/rds/master-password"
-  kms_key_id = var.kms_key_arn
-
-  rotation_rules {
-    automatically_after_days = 30
-  }
+  name                    = "${var.name_prefix}/rds/master-password"
+  kms_key_id              = var.kms_key_arn
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "db_password" {

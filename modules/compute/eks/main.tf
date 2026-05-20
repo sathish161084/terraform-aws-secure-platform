@@ -1,12 +1,14 @@
 module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=8a0efdbbc84180a26e0bacfd2b6fcfceac53b3b6"
 
   cluster_name    = "${var.name_prefix}-eks"
   cluster_version = "1.31"
+  create_kms_key  = false
 
-  cluster_endpoint_public_access  = true
-  cluster_endpoint_private_access = true
+  cluster_endpoint_public_access         = false
+  cluster_endpoint_private_access        = true
+  cloudwatch_log_group_retention_in_days = 365
+  cloudwatch_log_group_kms_key_id        = var.kms_key_arn
 
   vpc_id     = var.vpc_id
   subnet_ids = var.private_subnet_ids
@@ -33,6 +35,12 @@ module "eks" {
       max_size       = 3
       desired_size   = 2
       subnet_ids     = var.private_subnet_ids
+
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 1
+      }
     }
   }
 }

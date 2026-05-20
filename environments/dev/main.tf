@@ -9,6 +9,7 @@ module "vpc" {
 
   name_prefix = local.name_prefix
   vpc_cidr    = "10.20.0.0/16"
+  kms_key_arn = module.kms.key_arn
 
   availability_zones = [
     "us-east-1a",
@@ -56,6 +57,7 @@ module "ecr" {
     "backend",
     "worker"
   ]
+  kms_key_arn = module.kms.key_arn
 }
 
 module "secrets_manager" {
@@ -91,12 +93,15 @@ module "alb_waf" {
   name_prefix       = local.name_prefix
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
+  kms_key_arn       = module.kms.key_arn
 }
 
 module "security_baseline" {
   source = "../../modules/security/security-baseline"
 
-  name_prefix = local.name_prefix
+  name_prefix            = local.name_prefix
+  kms_key_arn            = module.kms.key_arn
+  create_config_recorder = false
 }
 
 module "cloudwatch" {
