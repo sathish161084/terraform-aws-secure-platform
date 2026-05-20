@@ -24,7 +24,8 @@ resource "aws_vpc_security_group_egress_rule" "all" {
 
 resource "aws_s3_bucket" "alb_access_logs" {
   #checkov:skip=CKV_AWS_145:ALB access log delivery supports SSE-S3 for this log bucket.
-  bucket = "${var.name_prefix}-alb-access-logs"
+  bucket        = "${var.name_prefix}-alb-access-logs"
+  force_destroy = true
 
   tags = {
     Name = "${var.name_prefix}-alb-access-logs"
@@ -154,6 +155,7 @@ resource "aws_s3_bucket_notification" "alb_access_logs" {
 }
 
 resource "aws_lb" "this" {
+  #checkov:skip=CKV_AWS_150:Dev environment must be destroyable for cost-controlled teardown.
   name               = "${var.name_prefix}-alb"
   load_balancer_type = "application"
   internal           = false
@@ -164,7 +166,7 @@ resource "aws_lb" "this" {
     prefix  = "${var.name_prefix}-alb"
     enabled = true
   }
-  enable_deletion_protection = true
+  enable_deletion_protection = false
   drop_invalid_header_fields = true
 
   depends_on = [aws_s3_bucket_policy.alb_access_logs]

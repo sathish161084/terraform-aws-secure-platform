@@ -1,7 +1,8 @@
 data "aws_caller_identity" "current" {}
 
 resource "aws_s3_bucket" "cloudtrail" {
-  bucket = "${var.name_prefix}-cloudtrail-logs"
+  bucket        = "${var.name_prefix}-cloudtrail-logs"
+  force_destroy = true
 }
 
 resource "aws_sns_topic" "cloudtrail_events" {
@@ -55,7 +56,20 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
 
 data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
   statement {
-    sid    = "AllowUseOfTheKey"
+    sid    = "EnableIamUserPermissions"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowAccountUseOfTheKey"
     effect = "Allow"
 
     principals {
@@ -74,7 +88,7 @@ data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
       "kms:RevokeGrant"
     ]
 
-    resources = ["arn:aws:kms:*:*:key/*"]
+    resources = ["*"]
   }
 
   statement {
@@ -91,7 +105,7 @@ data "aws_iam_policy_document" "cloudtrail_kms_key_policy" {
       "kms:GenerateDataKey*"
     ]
 
-    resources = ["arn:aws:kms:*:*:key/*"]
+    resources = ["*"]
   }
 }
 
@@ -304,7 +318,8 @@ resource "aws_iam_role_policy_attachment" "config" {
 }
 
 resource "aws_s3_bucket" "config" {
-  bucket = "${var.name_prefix}-aws-config-logs"
+  bucket        = "${var.name_prefix}-aws-config-logs"
+  force_destroy = true
 }
 
 resource "aws_sns_topic" "config_events" {

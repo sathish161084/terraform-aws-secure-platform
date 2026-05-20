@@ -73,6 +73,7 @@ resource "aws_iam_role_policy_attachment" "monitoring" {
 }
 
 resource "aws_db_instance" "this" {
+  #checkov:skip=CKV_AWS_293:Dev environment must be destroyable for cost-controlled teardown.
   identifier = "${var.name_prefix}-postgres"
 
   engine         = "postgres"
@@ -104,7 +105,7 @@ resource "aws_db_instance" "this" {
 
   publicly_accessible     = false
   backup_retention_period = 7
-  deletion_protection     = true
+  deletion_protection     = false
   skip_final_snapshot     = true
   apply_immediately       = true
 }
